@@ -1,5 +1,5 @@
 import 'dotenv/config';
-import redis from '../lib/redis/client';
+import { getRedisClient } from '../lib/redis/client';
 import { deleteCache } from '../lib/redis/cache';
 import {
   batchCacheProfiles,
@@ -87,5 +87,5 @@ testProfileCache()
     console.error('[Profile Cache Test] Encountered error:', error);
   })
   .finally(async () => {
-    await redis.quit();
+    await getRedisClient()?.quit();
   });

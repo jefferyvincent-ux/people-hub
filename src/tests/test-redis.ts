@@ -1,5 +1,5 @@
 import 'dotenv/config';
-import redis from '../lib/redis/client';
+import { getRedisClient } from '../lib/redis/client';
 import { CachePrefix, CacheTTL, batchGetCache, deleteCache, deleteCachePattern, existsCache, getCache, getCacheKey, getTTL, incrementCounter, setCache } from '../lib/redis/cache';
 import { checkRedisHealth } from '../lib/redis/health';
 
@@ -44,5 +44,5 @@ testRedis()
     console.error('[Redis Test] Encountered error:', error);
   })
   .finally(async () => {
-    await redis.quit();
+    await getRedisClient()?.quit();
   });

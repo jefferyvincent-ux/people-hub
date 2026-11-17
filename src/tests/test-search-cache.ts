@@ -1,5 +1,5 @@
 import 'dotenv/config';
-import redis from '../lib/redis/client';
+import { getRedisClient } from '../lib/redis/client';
 import { deleteCache, getTTL } from '../lib/redis/cache';
 import { cacheSearchResults, getCachedSearchResults, getSearchCacheKey } from '../lib/redis/search-cache';
 import type { ProfileSummary } from '@/types/linkedin';
@@ -66,5 +66,5 @@ testSearchCache()
     console.error('[Search Cache Test] Encountered error:', error);
   })
   .finally(async () => {
-    await redis.quit();
+    await getRedisClient()?.quit();
   });

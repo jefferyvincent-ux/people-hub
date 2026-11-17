@@ -67,17 +67,18 @@ Country-specific search results with automatic geo-targeting
 
 ### Prerequisites
 
-- Node.js 18+
-- [Supabase](https://supabase.com) account (free tier works)
+- Node.js 18.18+
+- A PostgreSQL database ([Supabase](https://supabase.com) free tier works)
 - [Bright Data](https://brightdata.com) account with API token
 - [Google AI Studio](https://makersuite.google.com) API key (Gemini)
+- Redis (optional; without it the app just skips the hot cache and uses PostgreSQL)
 
 ### Installation
 
 1. **Clone the repository**
 ```bash
 git clone https://github.com/jefferyvincent-ux/people-hub
-cd peoplehub
+cd people-hub
 ```
 
 2. **Install dependencies**
@@ -92,22 +93,22 @@ cp .env.example .env
 
 Edit `.env` and add your credentials:
 ```env
-# Database (Supabase PostgreSQL)
-DATABASE_URL="your-supabase-connection-pooling-url"
-DIRECT_URL="your-supabase-direct-url"
-
-# Supabase (optional for future features)
-NEXT_PUBLIC_SUPABASE_URL="your-supabase-project-url"
-NEXT_PUBLIC_SUPABASE_ANON_KEY="your-supabase-anon-key"
+# Database (any PostgreSQL connection string)
+DATABASE_URL="your-postgres-connection-url"
 
 # Bright Data API
 BRIGHTDATA_API_TOKEN="your-brightdata-api-token"
+# Optional, defaults to "unblocker"
+BRIGHTDATA_UNLOCKER_ZONE="unblocker"
 
 # Google AI (Gemini 2.0)
 GOOGLE_GENERATIVE_AI_API_KEY="your-google-ai-api-key"
 
-# Redis (optional, for hot cache)
-REDIS_URL="your-redis-url"
+# Redis hot cache (optional). Set all three or none; with any of them
+# missing the app runs without Redis. Set REDIS_TLS_ENABLED="true" for TLS.
+REDIS_HOST="your-redis-host"
+REDIS_PORT="6379"
+REDIS_PASSWORD="your-redis-password"
 ```
 
 4. **Set up database**
@@ -152,7 +153,7 @@ User Query → AI Parser (Gemini 2.0) → Cache Check → LinkedIn Scraper → D
 - **Cache:** Redis with ioredis 5.8.2 (optional, hot cache)
 
 ### AI/LLM
-- **Query Parsing:** Google Gemini 2.0 Flash (`gemini-2.0-flash-exp`)
+- **LLM:** Google Gemini 2.0 Flash (`gemini-2.0-flash-exp` for query parsing and search-query generation, `gemini-2.0-flash` for research summaries and reports)
 - **AI SDK:** Vercel AI SDK 5.0.60 (`@ai-sdk/google` 2.0.17)
 - **Research Workflows:** LangChain + LangGraph 1.0.1
 - **Schema Validation:** Zod 3.25.76
@@ -235,15 +236,16 @@ Automated due diligence reports using LangChain's LangGraph framework:
 ## 🏗️ Project Structure
 
 ```
-peoplehub/
+people-hub/
 ├── prisma/
 │   └── schema.prisma              # Database schema (Person, Search, Research models)
 ├── src/
 │   ├── app/
 │   │   ├── api/
 │   │   │   ├── search/            # Main search endpoint
-│   │   │   ├── research/          # Research engine endpoint
-│   │   │   ├── profiles/          # Recent profiles API
+│   │   │   ├── research/          # Start research, list reports, [id] and [id]/stream (SSE)
+│   │   │   ├── profile/           # Single profile lookup
+│   │   │   ├── profiles/          # Batch and recent profiles
 │   │   │   └── proxy-image/       # Image proxy for LinkedIn avatars
 │   │   ├── search/                # Search results page
 │   │   ├── previous/              # Previous searches page
@@ -254,24 +256,27 @@ peoplehub/
 │   │   ├── Navigation.tsx         # Glassmorphism navbar
 │   │   ├── PersonCard.tsx         # Expandable profile card
 │   │   ├── SearchBar.tsx          # Search input component
-│   │   ├── FloatingOrbs.tsx       # 3D magnifying glasses
+│   │   ├── ResearchProgress.tsx   # Live research progress
+│   │   ├── ResearchReport.tsx     # Rendered research report
 │   │   └── LoadingState.tsx       # Skeleton loader
 │   ├── lib/
 │   │   ├── brightdata/            # Bright Data API integration
 │   │   │   ├── search.ts          # Google Search API
 │   │   │   ├── linkedin.ts        # LinkedIn Scraper API
-│   │   │   └── client.ts          # MCP client for research
-│   │   ├── cache/                 # Caching layer (DB + Redis)
-│   │   ├── redis/                 # Redis hot cache
+│   │   │   ├── research.ts        # Web search and scraping for research
+│   │   │   └── client.ts          # MCP client
+│   │   ├── cache/                 # PostgreSQL cache (profiles, research)
+│   │   ├── redis/                 # Optional Redis hot cache
 │   │   ├── search/                # AI query parsing (Gemini)
 │   │   ├── research/              # LangGraph research engine
-│   │   │   ├── graph.ts           # Research workflow graph
-│   │   │   ├── nodes.ts           # Individual workflow nodes
-│   │   │   └── runner.ts          # Graph execution
+│   │   │   ├── graph.ts           # Graph nodes and wiring
+│   │   │   ├── llm-service.ts     # Gemini calls (queries, summaries, report)
+│   │   │   ├── runner.ts          # Graph execution and status updates
+│   │   │   └── types.ts           # Graph state and data types
 │   │   └── prisma.ts              # Prisma client singleton
+│   ├── tests/                     # Test scripts (see Testing below)
 │   └── types/
 │       └── linkedin.ts            # LinkedIn profile types
-├── tests/                         # Test scripts
 └── package.json
 ```
 
@@ -288,11 +293,18 @@ peoplehub/
 - `npx prisma db push` - Push schema changes to database
 - `npx prisma studio` - Open Prisma Studio (database GUI)
 
+### Checks
+- `npx tsc --noEmit` - Type check
+- `npm run lint` - ESLint
+- `npm run build` - Production build (works without any env vars set)
+
 ### Testing
-- `npx tsx src/tests/test-parser.ts` - Test AI query parsing
-- `npx tsx src/tests/test-search-flow.ts` - Test search → Google → LinkedIn flow
-- `npx tsx src/tests/test-cache.ts` - Test caching layer
-- `npx tsx src/tests/test-recent-api.ts` - Test /api/profiles/recent endpoint
+There is no test runner yet. `src/tests/` holds standalone scripts run with `npx tsx`, and most of them call real services (database, Redis, Bright Data or Gemini), so they need the matching env vars.
+- `npx tsx src/tests/test-parser.ts` - AI query parsing (Gemini)
+- `npx tsx src/tests/test-search-flow.ts` - Search → Google → LinkedIn flow
+- `npx tsx src/tests/test-cache.ts` - Database caching layer
+- `npx tsx src/tests/test-redis.ts` - Redis cache helpers
+- `npx tsx src/tests/test-recent-api.ts` - /api/profiles/recent endpoint
 
 ## 🎓 Use Cases
 
@@ -318,7 +330,7 @@ Please ensure your PR:
 
 ## 📝 License
 
-MIT License - see [LICENSE](LICENSE) file for details.
+MIT License.
 
 ## 🙏 Acknowledgments
 
