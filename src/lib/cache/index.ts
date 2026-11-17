@@ -1,5 +1,5 @@
 import { prisma } from '@/lib/prisma';
-import { Prisma } from '@prisma/client';
+import { Prisma } from '@/generated/prisma/client';
 import { ProfileData, Experience, Education, Language } from '@/types/linkedin';
 
 const CACHE_FRESHNESS_DAYS = 180;

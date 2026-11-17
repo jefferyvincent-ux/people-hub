@@ -113,9 +113,10 @@ REDIS_PASSWORD="your-redis-password"
 
 4. **Set up database**
 ```bash
-npx prisma generate
 npx prisma db push
 ```
+
+The Prisma client is generated ahead of time and checked in under `src/generated/prisma`, so `npm install` needs nothing outside the npm registry. It talks to Postgres through the `pg` driver adapter. After you change `prisma/schema.prisma`, run `npm run db:generate` and commit the result (this one needs to download Prisma's engine files, so it needs normal internet access).
 
 5. **Run the development server**
 ```bash
@@ -148,7 +149,7 @@ User Query → AI Parser (Gemini 2.0) → Cache Check → LinkedIn Scraper → D
 - **Framework:** Next.js 15.5.4 with App Router (API Routes)
 - **Runtime:** Node.js 18+
 - **Language:** TypeScript 5 (strict mode)
-- **ORM:** Prisma 6.5.0
+- **ORM:** Prisma 6 (client engine with the `pg` driver adapter)
 - **Database:** PostgreSQL (Supabase)
 - **Cache:** Redis with ioredis 5.8.2 (optional, hot cache)
 
@@ -273,7 +274,8 @@ people-hub/
 │   │   │   ├── llm-service.ts     # Gemini calls (queries, summaries, report)
 │   │   │   ├── runner.ts          # Graph execution and status updates
 │   │   │   └── types.ts           # Graph state and data types
-│   │   └── prisma.ts              # Prisma client singleton
+│   │   └── prisma.ts              # Prisma client singleton (pg adapter)
+│   ├── generated/prisma/          # Generated Prisma client (checked in)
 │   ├── tests/                     # Test scripts (see Testing below)
 │   └── types/
 │       └── linkedin.ts            # LinkedIn profile types
@@ -289,7 +291,7 @@ people-hub/
 - `npm run lint` - Run ESLint
 
 ### Database
-- `npx prisma generate` - Generate Prisma Client
+- `npm run db:generate` - Regenerate the Prisma Client into `src/generated/prisma` (commit the output)
 - `npx prisma db push` - Push schema changes to database
 - `npx prisma studio` - Open Prisma Studio (database GUI)
 

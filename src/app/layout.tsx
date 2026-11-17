@@ -1,17 +1,15 @@
 import type { Metadata } from "next";
-import { Playfair_Display, Geist_Mono } from "next/font/google";
+import localFont from "next/font/local";
+import { GeistMono } from "geist/font/mono";
 import "./globals.css";
 import { Navigation } from "@/components/Navigation";
 
-const playfair = Playfair_Display({
+// Fonts come from npm packages and are bundled at build time, so the build
+// never has to reach Google Fonts.
+const playfair = localFont({
+  src: "../../node_modules/@fontsource-variable/playfair-display/files/playfair-display-latin-wght-normal.woff2",
   variable: "--font-playfair",
-  subsets: ["latin"],
-  weight: ["400", "500", "600", "700", "800", "900"],
-});
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
+  weight: "400 900",
 });
 
 export const metadata: Metadata = {
@@ -27,7 +25,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body
-        className={`${playfair.variable} ${geistMono.variable} antialiased`}
+        className={`${playfair.variable} ${GeistMono.variable} antialiased`}
       >
         <Navigation />
         {children}
